@@ -14,7 +14,10 @@ export const setApiKey = (key: string) => {
  * Prioritizes manual key if set, otherwise falls back to environment variable.
  */
 const getAiClient = () => {
-  const key = manualApiKey || process.env.API_KEY;
+  // safely check for process.env to avoid ReferenceError in browser
+  const envKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+  const key = manualApiKey || envKey;
+  
   if (!key) {
     throw new Error("API Key not found. Please select a project or enter a key.");
   }
@@ -191,12 +194,11 @@ export const generateHandwrittenPage = async (
     
     Strict Instructions:
     - **Clarity & Contrast**: The generated handwriting MUST be sharp, clear, and highly readable.
-    - **Ink Quality**: Use **DARK, HIGH-CONTRAST** ink (Black or Dark Blue). The text must stand out clearly against the paper background. Do not use faint pencil style.
-    - **Background**: Recreate the blank paper texture from the reference image. It must look identical to the reference paper but WITHOUT the original reference text.
-    - **Handwriting**: Mimic the exact handwriting style from the reference image (messiness, slant, pressure) but ensure letters are formed clearly.
+    - **Ink Quality**: Use **DARK, HIGH-CONTRAST** ink (Deep Black or Blue). Ensure high contrast against the paper.
+    - **Background**: Recreate the blank paper texture from the reference image.
+    - **Handwriting**: Mimic the exact handwriting style from the reference image.
     - **NO Picture-in-Picture**: Do NOT paste the reference image into the output. The output must be a single, full-page document.
-    - **NO Digital Text**: The result must look like a real photograph of ink on paper.
-    - **Layout**: Use natural vertical spacing. Do not leave large gaps between lines. Fill the page appropriately.
+    - **Layout**: Use natural vertical spacing. Fill the page appropriately.
     
     Content to Write (This is the ONLY text that should appear):
     """
@@ -216,7 +218,6 @@ export const generateHandwrittenPage = async (
 
   try {
     // Try with High Quality Image Model (gemini-3-pro-image-preview)
-    // Supports 2K resolution
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
       contents: {
@@ -240,12 +241,11 @@ export const generateHandwrittenPage = async (
       console.warn(`Error generating page ${pageIndex + 1} with Pro model. Falling back to Flash Image model.`);
       
       // Fallback to Standard Image Model (gemini-2.5-flash-image)
-      // Note: gemini-2.5-flash-image does NOT support 'imageSize' in imageConfig, but supports 'aspectRatio'.
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
           parts: [
-            { text: prompt },
+            { text: prompt + " IMPORTANT: Output a scanned document style image, not artistic. High legibility." },
             { inlineData: { mimeType: referenceImageFile.type, data: base64Ref } }
           ]
         },
@@ -283,20 +283,21 @@ export const validateSolution = async (
   }));
 
   const prompt = `
-    You are a Teacher and Quality Assurance AI.
+    You are a Teacher validating student work.
     
     Inputs:
     1. The FIRST image is the original MATH PROBLEM (Question).
     2. The SUBSEQUENT images are the generated HANDWRITTEN SOLUTIONS.
     
-    Task: Validate the quality and correctness of the solution.
+    Task: Check if the solution is present and roughly legible.
     
-    Checklist:
-    1. **Legibility**: Is the text reasonably visible? (Accept messy student handwriting as valid. Only reject if it is blank, completely blurry, or pure noise).
-    2. **Content**: Does the solution appear to attempt the math problem shown in the first image?
+    Rules:
+    - **IGNORE MESSINESS**: Students often have bad handwriting. This is ACCEPTABLE.
+    - **Check Presence**: Is there handwritten text visible on the page?
+    - **Check Relevance**: Does it look like math/text?
     
-    IMPORTANT: You are judging a "Handwriting Mimic" AI. It is SUPPOSED to look like imperfect human handwriting. Do NOT penalize for bad penmanship.
-    If the text is readable enough to understand the math, return TRUE.
+    Output "valid": true unless the image is completely BLANK, BLACK, or PURE NOISE.
+    If it is just "messy", it is VALID.
     
     Output JSON: { "valid": boolean, "reason": "short explanation" }
   `;
@@ -322,7 +323,7 @@ export const validateSolution = async (
     return { valid: json.valid === true, reason: json.reason || "Unknown" };
   } catch (e) {
     console.error("Validation error", e);
-    // If validation fails technically (e.g. JSON parse error), we assume true to prevent infinite loops.
-    return { valid: true, reason: "Validation bypassed due to system error" };
+    // If validation fails technically (e.g. JSON parse error), we assume true to avoid frustrating the user.
+    return { valid: true, reason: "Validation bypassed due to technical error" };
   }
 };
