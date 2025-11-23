@@ -1,0 +1,5 @@
+{
+  "name": "Copy of MathMimic - Handwriting Solver",
+  "description": "Upload a handwritten math problem and a sample of your handwriting. The app solves the problem and generates the solution mimicking your handwriting and paper style, downloadable as a PDF.",
+  "requestFramePermissions": []
+}
