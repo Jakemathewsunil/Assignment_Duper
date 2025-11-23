@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [isKeySelected, setIsKeySelected] = useState<boolean>(false);
   const [showManualEntry, setShowManualEntry] = useState<boolean>(false);
   const [manualKey, setManualKey] = useState<string>('');
+  const [hasAiStudio, setHasAiStudio] = useState<boolean>(false);
   
   const [questionImage, setQuestionImage] = useState<UploadedFile | null>(null);
   const [handwritingImage, setHandwritingImage] = useState<UploadedFile | null>(null);
@@ -31,8 +32,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkKey = async () => {
       if ((window as any).aistudio) {
+        setHasAiStudio(true);
         const hasKey = await (window as any).aistudio.hasSelectedApiKey();
         if (hasKey) setIsKeySelected(true);
+      } else {
+        // If not in AI Studio environment (e.g. GitHub Pages), default to manual entry
+        setShowManualEntry(true);
       }
     };
     checkKey();
@@ -209,7 +214,7 @@ const App: React.FC = () => {
             System requires authorization. Please insert coin or select API Key.
           </p>
           
-          {!showManualEntry ? (
+          {!showManualEntry && hasAiStudio ? (
             <div className="space-y-4 font-mono">
               <button
                 onClick={handleSelectKey}
@@ -239,13 +244,15 @@ const App: React.FC = () => {
                 />
               </div>
               <div className="flex gap-3 font-mono">
-                 <button
-                  type="button"
-                  onClick={() => setShowManualEntry(false)}
-                  className="flex-1 py-2 px-4 bg-gray-200 text-black border-2 border-black hover:bg-gray-300 font-bold"
-                >
-                  BACK
-                </button>
+                 {hasAiStudio && (
+                   <button
+                    type="button"
+                    onClick={() => setShowManualEntry(false)}
+                    className="flex-1 py-2 px-4 bg-gray-200 text-black border-2 border-black hover:bg-gray-300 font-bold"
+                  >
+                    BACK
+                  </button>
+                 )}
                 <button
                   type="submit"
                   className="flex-1 py-2 px-4 bg-black text-white border-2 border-black hover:bg-gray-800 font-bold flex items-center justify-center gap-2"
